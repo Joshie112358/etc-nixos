@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, modulePath, inputs, ... }:
 
 {
   imports =
@@ -14,11 +14,11 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # networking.hostName = "nixos"; # Define your hostname.
+  networking.hostName = "shiva"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Set your time zone.
-  # time.timeZone = "Europe/Amsterdam";
+  time.timeZone = "America/Mexico_City";
 
   # The global useDHCP flag is deprecated, therefore explicitly set to false here.
   # Per-interface useDHCP will be mandatory in the future, so this generated config
@@ -40,11 +40,30 @@
   # Enable the X11 windowing system.
   services.xserver.enable = true;
 
+  nixpkgs.config.allowUnfree = true;
 
   # Enable the GNOME Desktop Environment.
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  
+
+  programs.zsh = {
+    enable = true;
+    enableCompletion = true;
+    autosuggestions.enable = true;
+    interactiveShellInit = ''
+      # z - jump around
+      # source ${pkgs.fetchurl {url = "https://github.com/rupa/z/raw/2ebe419ae18316c5597dd5fb84b5d8595ff1dde9/z.sh"; sha256 = "0ywpgk3ksjq7g30bqbhl9znz3jh6jfg8lxnbdbaiipzgsy41vi10";}}
+      save_aliases=$(alias -L)
+      export ZSH=${pkgs.oh-my-zsh}/share/oh-my-zsh
+      export ZSH_THEME="bira" #"lambda"
+      plugins=(git sudo colorize extract history postgres)
+      source $ZSH/oh-my-zsh.sh
+      eval $save_aliases; unset save_aliases
+    '';
+    promptInit = ''
+      any-nix-shell zsh --info-right | source /dev/stdin
+  '';
+  };
 
   # Configure keymap in X11
   # services.xserver.layout = "us";
@@ -74,6 +93,8 @@
      firefox
      emacs
      zsh
+     git
+     any-nix-shell
    ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -94,6 +115,10 @@
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+
+  # For nix flakes
+  nix.package = pkgs.nixFlakes;
+  nix.extraOptions = "experimental-features = nix-command flakes";
 
   users.mutableUsers = false;
 

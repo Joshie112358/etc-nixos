@@ -26,6 +26,9 @@
   networking.useDHCP = false;
   networking.interfaces.wlp2s0.useDHCP = true;
 
+  networking.firewall.allowedTCPPorts = [ 22 80 5432 587 443 ];
+  networking.firewall.allowedUDPPorts = [ 5938 ];
+
   # Configure network proxy if necessary
   # networking.proxy.default = "http://user:password@proxy:port/";
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
@@ -42,9 +45,7 @@
 
   nixpkgs.config.allowUnfree = true;
 
-  # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+
 
   programs.zsh = {
     enable = true;
@@ -69,6 +70,41 @@
   # services.xserver.layout = "us";
   # services.xserver.xkbOptions = "eurosign:e";
 
+  # Enable the GNOME Desktop Environment.
+  #services.xserver.displayManager.gdm.enable = true;
+  #services.xserver.desktopManager.gnome.enable = true;
+
+  # Enable the X11 windowing system.
+  #services.xserver.enable = true;
+  services.xserver.layout = "us";
+  services.xserver.xkbOptions = "ctrl:nocaps";
+  services.xserver.xkbVariant = "altgr-intl";
+  services.xserver.windowManager.xmonad = {
+    enable = true;
+    enableContribAndExtras = true;
+    extraPackages = haskellPackages:[
+      haskellPackages.xmonad-contrib
+      haskellPackages.xmonad-extras
+      haskellPackages.xmonad
+    ];
+  };
+  services.xserver.displayManager = {
+    defaultSession = "none+xmonad";
+    gdm.enable = true;
+    sessionCommands = let myCustomLayout = pkgs.writeText "xkb-layout" ''
+                        ! swap Caps_Lock and Control_R
+                        remove Lock = Caps_Lock
+                        remove Control = Control_R
+                        keysym Control_R = Caps_Lock
+                        keysym Caps_Lock = Control_R
+                        add Lock = Caps_Lock
+                        add Control = Control_R
+                      '';
+                      in "${pkgs.xorg.xmodmap}/bin/xmodmap ${myCustomLayout}";
+    autoLogin.user = "joshuabc";
+  };
+  services.xserver.desktopManager.gnome.enable = true;
+
   # Enable CUPS to print documents.
   # services.printing.enable = true;
 
@@ -85,6 +121,37 @@
   #   extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
   # };
 
+
+  environment.interactiveShellInit = ''
+    # alias fn='cabal repl' #TODO:Fix
+    # alias 'cabal run'='cabal new-run' #TODO:Fix
+    # alias 'cabal build'='cabal new-build' #TODO:Fix
+    alias cat='bat'
+    alias _cat='cat'
+    alias crun='cabal new-run'
+    alias ct='cabal new-test'
+    alias cr='cabal new-repl'
+    alias cb='cabal new-build'
+    alias tr='cd ~/src/telomare && cabal new-run telomare-mini-repl -- --haskell'
+    # alias telomare-repl='cd ~/src/telomare && cabal new-run telomare-mini-repl -- --haskell'
+    alias gs='git status'
+    alias ga='git add -A'
+    alias gd='git diff'
+    alias gc='git commit -am'
+    alias gcs='git commit -am "squash"'
+    alias gbs='git branch --sort=-committerdate'
+    alias sendmail='/run/current-system/sw/bin/msmtp --debug --from=default --file=/etc/msmtp/laurus -t'
+    alias xclip='xclip -selection c'
+    alias please='sudo'
+    alias n='nix-shell shell.nix'
+    alias nod='nixops deploy -d laurus-nobilis-gce'
+    alias sn='sudo nixos-rebuild switch'
+    alias gr='grep -R --exclude='TAGS' --exclude-dir={.stack-work,dist-newstyle,result,result-2} -n'
+    alias where='pwd'
+    alias nd='nix develop'
+  '';
+
+
   # List packages installed in system profile. To search, run:
    #$ nix search wget
    environment.systemPackages = with pkgs; [
@@ -93,7 +160,29 @@
      firefox
      emacs
      zsh
+     git
+     any-nix-shell
+     haskellPackages.xmobar
+     postgresql_11
+     haskellPackages.yesod-bin
+     stack
+     ripgrep
+     msmtp
+     #gmp
+     google-chrome
+     direnv
+     zlib
+     zip
+     dmenu
+     bat
+     feh
+
    ];
+
+  nixpkgs.config.permittedInsecurePackages = [
+    "google-chrome-81.0.4044.138"
+    #"openssl-1.0.2u"
+  ];
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
@@ -118,6 +207,9 @@
   nix.package = pkgs.nixFlakes;
   nix.extraOptions = "experimental-features = nix-command flakes";
 
+  nix.allowedUsers = ["@wheel" "joshuabc"];
+  nix.trustedUsers = ["root" "joshuabc"];
+
   users.mutableUsers = false;
 
   # Password generated with ```mkpasswd -m sha-512```
@@ -133,6 +225,22 @@
     hashedPassword = "$6$y1n2g52P63iUa5b.$9RS3Q2eahVKH4HuvJVNK/Iyj1QF2ctP2dtDI4ko52ZgZxfkhW4pWPbTtMOf/Bvihwsro1aBVxstoxUBuT1lcM.";
     shell = pkgs.zsh; #"/run/current-system/sw/bin/bash";
   };
+
+  services.postgresql = {
+      enable = true;
+      package = pkgs.postgresql_11;
+      enableTCPIP = true;
+      authentication = pkgs.lib.mkOverride 10 ''
+        local all all trust
+        host all all ::1/128 trust
+      '';
+      initialScript = pkgs.writeText "backend-initScript" ''
+        CREATE ROLE analyzer WITH LOGIN PASSWORD 'anapass';
+        CREATE DATABASE aanalyzer_yesod;
+        GRANT ALL PRIVILEGES ON DATABASE aanalyzer_yesod TO analyzer;
+      '';
+    };
+
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

@@ -8,7 +8,7 @@
 
   outputs = inputs@{ self, nixpkgs, ... }:
   {
-    nixosConfigurations.olimpo = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.shiva = nixpkgs.lib.nixosSystem {
       # inherit system;
       system = "x86_64-linux";
       # modules = [ ./configuration.nix { self1 = self; nixpkgs = nixpkgs; } ];
